@@ -1,101 +1,168 @@
-import Image from "next/image";
+"use client";
+
+import axios from 'axios'; 
+import { getSession, signOut, useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import styles from './page.module.css';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  
+  const [isEditing, setIsEditing] = useState(false);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+  const [userData, setUserData] = useState({
+    name: session?.user.name || '',
+    prenom: session?.user.prenom || '',
+    dateDeNaissance: session?.user.dateDeNaissance || '',
+    adresse: session?.user.adresse || '',
+    numeroDeTelephone: session?.user.numeroDeTelephone || '',
+  });
+
+  useEffect(() => {
+    if (session) {
+      console.log("Session data:", session);
+      setUserData({
+        name: session.user.name,
+        prenom: session.user.prenom,
+        dateDeNaissance: session.user.dateDeNaissance,
+        adresse: session.user.adresse,
+        numeroDeTelephone: session.user.numeroDeTelephone,
+      });
+    }
+  }, [session]);
+
+  const handleLogin = () => {
+    router.push('/login');
+  };
+
+  const handleLogout = () => {
+    signOut();
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setUserData({ ...userData, [name]: value });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setIsEditing(false); 
+  };
+
+  const handleSaveAndLogout = async () => {
+    const session = await getSession();
+    if (!session || !session.user.id) {
+      console.error('No session or user ID found');
+      return;
+    }
+
+    try {
+      const response = await axios.put('/api/updateUser', {
+        id: session.user.id,
+        name: userData.name,
+        prenom: userData.prenom,
+        dateDeNaissance: userData.dateDeNaissance ? new Date(userData.dateDeNaissance).toISOString() : null,
+        adresse: userData.adresse,
+        numeroDeTelephone: userData.numeroDeTelephone,
+      });
+
+      console.log('Server response:', response.data);
+      signOut();
+    } catch (error) {
+      console.error('Error updating profile:', error);
+    }
+  };
+  return (
+    <div className={styles.homeContainer}>
+      <div className={styles.wrapper}>
+        {status !== "authenticated" ? (
+          <>
+            <h2 className={styles.heading}>Welcome to our website</h2>
+            <hr className={styles.hrLine} />
+            <p className={styles.paragraph}>Please sign in or create an account to continue.</p>
+            <button className={styles.btn} onClick={handleLogin}>Sign In / Sign Up</button>
+          </>
+        ) : (
+          <>
+            <h2 className={styles.heading}>Welcome, {session.user.name}</h2>
+            <hr className={styles.hrLine} />
+            <form onSubmit={handleSubmit}>
+              <p className={styles.paragraph}>First Name:</p>
+              {isEditing ? (
+                <input
+                  type="text"
+                  name="name"
+                  value={userData.name}
+                  onChange={handleChange}
+                  className={styles.input}
+                />
+              ) : (
+                <span>{userData.name}</span>
+              )}
+              <p className={styles.paragraph}>Last Name:</p>
+              {isEditing ? (
+                <input
+                  type="text"
+                  name="prenom"
+                  value={userData.prenom}
+                  onChange={handleChange}
+                  className={styles.input}
+                />
+              ) : (
+                <span>{userData.prenom}</span>
+              )}
+              <p className={styles.paragraph}>Date Of Birth:</p>
+              {isEditing ? (
+                <input
+                  type="date"
+                  name="dateDeNaissance"
+                  value={userData.dateDeNaissance}
+                  onChange={handleChange}
+                  className={styles.input}
+                />
+              ) : (
+                <span>{userData.dateDeNaissance}</span>
+              )}
+              <p className={styles.paragraph}>Adresse:</p>
+              {isEditing ? (
+                <input
+                  type="text"
+                  name="adresse"
+                  value={userData.adresse}
+                  onChange={handleChange}
+                  className={styles.input}
+                />
+              ) : (
+                <span>{userData.adresse}</span>
+              )}
+              <p className={styles.paragraph}>Phone Number:</p>
+              {isEditing ? (
+                <input
+                  type="text"
+                  name="numeroDeTelephone"
+                  value={userData.numeroDeTelephone}
+                  onChange={handleChange}
+                  className={styles.input}
+                />
+              ) : (
+                <span>{userData.numeroDeTelephone}</span>
+              )}
+              
+              {isEditing ? (
+                <>
+                  <button type="submit" className={styles.btn}>Update</button>
+                  <button type="button" className={styles.btn} onClick={() => setIsEditing(false)}>Cancel</button>
+                </>
+              ) : (
+                <button type="button" className={styles.btn} onClick={() => setIsEditing(true)}>Edit Profile</button>
+              )}
+            </form>
+            <button className={styles.btn} onClick={handleSaveAndLogout}>Save & Sign out</button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
